@@ -60,9 +60,21 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('pt-BR');
 }
 
+// Token da sessão (30 dias). Vai no header Authorization: o site (github.io) e a API
+// (afonsolelis.tech) são sites diferentes, e cookie entre sites é bloqueado.
+const TOKEN_KEY = 'gba-token';
+const getToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } };
+const setToken = (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* modo privado */ } };
+
 async function api(path, opts = {}) {
-  const res = await fetch(API + path, { credentials: 'include', ...opts });
-  if (res.status === 401 && !path.startsWith('/login')) throw Object.assign(new Error('login'), { login: true });
+  const headers = { ...(opts.headers || {}) };
+  const t = getToken();
+  if (t) headers.authorization = `Bearer ${t}`;
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401 && !path.startsWith('/login')) {
+    setToken('');
+    throw Object.assign(new Error('login'), { login: true });
+  }
   return res;
 }
 
@@ -88,7 +100,7 @@ function askPin() {
       msg.className = 'hint'; msg.textContent = 'Entrando…';
       try {
         const r = await api('/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) });
-        if (r.ok) { cleanup(); return resolve(); }
+        if (r.ok) { setToken((await r.json()).token); cleanup(); return resolve(); }
         const j = await r.json().catch(() => ({}));
         msg.className = 'hint err';
         msg.textContent = r.status === 429 ? `Muitas tentativas. Espere ${Math.ceil((j.segundos || 900) / 60)} min.` : 'PIN errado';
@@ -118,11 +130,13 @@ function askPin() {
 }
 
 async function ensureLogin() {
-  try {
-    const r = await api('/me');
-    if (r.ok) return;
-  } catch (e) {
-    if (!e.login) throw e;
+  if (getToken()) {
+    try {
+      const r = await api('/me');
+      if (r.ok) return;
+    } catch (e) {
+      if (!e.login) throw e;
+    }
   }
   await askPin();
 }
@@ -161,9 +175,13 @@ function card(g) {
   const cover = el('div', { className: 'cover' }, el('span', { className: 'sys', textContent: SYS[g.ext] }));
   cover.style.setProperty('--c', m.color);
   if (g.shot) {
-    const img = el('img', { alt: '', loading: 'lazy', src: `${API}/shot/${g.id}?t=${encodeURIComponent(g.shot)}` });
-    img.crossOrigin = 'use-credentials';
-    img.onerror = () => img.replaceWith(el('span', { className: 'mono', textContent: short }));
+    // <img> não manda o header Authorization: busca a capa com fetch e usa um blob.
+    const img = el('img', { alt: '' });
+    const fallback = () => img.replaceWith(el('span', { className: 'mono', textContent: short }));
+    api(`/shot/${g.id}?v=${encodeURIComponent(g.shot)}`)
+      .then(r => r.ok ? r.blob() : Promise.reject())
+      .then(b => { img.src = URL.createObjectURL(b); })
+      .catch(fallback);
     cover.append(img);
   } else {
     cover.append(el('span', { className: 'mono', textContent: short }));
@@ -177,8 +195,8 @@ function card(g) {
       el('div', { className: 'save' + (last ? ' has' : ''), textContent: last ? `● salvo ${ago(last)}` : 'sem save' })));
 }
 
-$('#logout').onclick = async () => {
-  await api('/logout', { method: 'POST' }).catch(() => {});
+$('#logout').onclick = () => {
+  setToken('');
   location.href = './';
 };
 
@@ -192,7 +210,7 @@ $('#upload').onchange = async (e) => {
     await new Promise((resolve) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', `${API}/rom/${id}.${m[2]}`);
-      xhr.withCredentials = true;
+      xhr.setRequestHeader('authorization', `Bearer ${getToken()}`);
       xhr.upload.onprogress = (p) => { status.textContent = `Enviando ${f.name}… ${Math.round(100 * p.loaded / p.total)}%`; };
       xhr.onload = () => { status.textContent = xhr.status === 200 ? `${f.name} enviado.` : `${f.name}: erro ${xhr.status}`; resolve(); };
       xhr.onerror = () => { status.textContent = `${f.name}: falhou`; resolve(); };

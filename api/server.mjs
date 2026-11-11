@@ -9,6 +9,10 @@
 //
 // Variáveis: S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION,
 // PIN_SCRYPT ("<salt hex>:<hash hex>"), SESSION_SECRET, ALLOWED_ORIGINS (vírgula).
+//
+// Sessão: o login devolve um token assinado (HMAC) que o site manda em
+// `Authorization: Bearer`. Não dá para usar cookie: o site fica em github.io e a
+// API em afonsolelis.tech, e os navegadores bloqueiam cookie entre sites diferentes.
 
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -23,9 +27,8 @@ const AK = env.S3_ACCESS_KEY;
 const SK = env.S3_SECRET_KEY;
 const SESSION_SECRET = env.SESSION_SECRET;
 const [PIN_SALT, PIN_HASH] = (env.PIN_SCRYPT || ':').split(':');
-const ORIGINS = new Set((env.ALLOWED_ORIGINS || 'https://gba.afonsolelis.tech').split(',').map(s => s.trim()));
+const ORIGINS = new Set((env.ALLOWED_ORIGINS || 'https://afonsolelis.github.io').split(',').map(s => s.trim()));
 const SESSION_DAYS = 30;
-const COOKIE = 'gba_sess';
 
 for (const [k, v] of Object.entries({ S3_ACCESS_KEY: AK, S3_SECRET_KEY: SK, SESSION_SECRET, PIN_SCRYPT: PIN_HASH })) {
   if (!v) { console.error(`faltando ${k}`); process.exit(1); }
@@ -87,9 +90,8 @@ function makeSession() {
 }
 
 function validSession(req) {
-  const raw = (req.headers.cookie || '').split(/;\s*/).find(c => c.startsWith(COOKIE + '='));
-  if (!raw) return false;
-  const [payload, sig] = raw.slice(COOKIE.length + 1).split('.');
+  const raw = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const [payload, sig] = raw.split('.');
   if (!payload || !sig) return false;
   const want = hmac(SESSION_SECRET, payload);
   const got = Buffer.from(sig, 'base64url');
@@ -189,12 +191,8 @@ const routes = {
       return send(res, 401, { erro: 'pin' });
     }
     fails.delete(ip);
-    send(res, 200, { ok: true }, {
-      'set-cookie': `${COOKIE}=${makeSession()}; Max-Age=${SESSION_DAYS * 86400}; Path=/; HttpOnly; Secure; SameSite=Strict`,
-    });
+    send(res, 200, { ok: true, token: makeSession(), dias: SESSION_DAYS });
   },
-
-  'POST /logout': async (req, res) => send(res, 200, { ok: true }, { 'set-cookie': `${COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict` }),
 
   'GET /me': async (req, res) => send(res, 200, { ok: true }),
 
@@ -267,24 +265,23 @@ const routes = {
   },
 };
 
-const PUBLIC = new Set(['GET /health', 'POST /login', 'POST /logout']);
+const PUBLIC = new Set(['GET /health', 'POST /login']);
 
 http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && ORIGINS.has(origin)) {
     res.setHeader('access-control-allow-origin', origin);
-    res.setHeader('access-control-allow-credentials', 'true');
     res.setHeader('vary', 'Origin');
   }
   if (req.method === 'OPTIONS') {
     if (!origin || !ORIGINS.has(origin)) return send(res, 403, 'origem');
     return send(res, 204, '', {
       'access-control-allow-methods': 'GET, PUT, POST',
-      'access-control-allow-headers': 'content-type',
+      'access-control-allow-headers': 'authorization, content-type',
       'access-control-max-age': '86400',
     });
   }
-  // Pedido de navegador vindo de outra origem: recusa (o cookie é SameSite=Strict, mas reforça).
+  // Pedido de navegador vindo de outra origem: recusa.
   if (origin && !ORIGINS.has(origin)) return send(res, 403, 'origem');
 
   const url = new URL(req.url, 'http://x');

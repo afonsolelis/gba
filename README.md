@@ -3,7 +3,7 @@
 Emulador de Game Boy Advance (e GB/GBC) no navegador, pensado para o celular, com
 login por PIN e saves sincronizados num bucket S3 (RustFS) na VPS.
 
-- **Site:** https://gba.afonsolelis.tech — estático, publicado pelo GitHub Pages a partir de `docs/`.
+- **Site:** https://afonsolelis.github.io/gba/ — estático, publicado pelo GitHub Pages a partir de `docs/`.
 - **API:** https://gba-api.afonsolelis.tech — `api/server.mjs`, Node 22 sem dependências, no Coolify (projeto `gba`).
 - **Lake:** bucket `gba` no RustFS (`s3.afonsolelis.tech`), usuário `gba-app` com acesso só a esse bucket.
 
@@ -12,7 +12,7 @@ Este repositório não tem ROM, save nem segredo: tudo isso fica no bucket, atr�
 ## Como funciona
 
 ```
-celular / navegador ──(PIN → cookie HttpOnly)──► gba-api ──(SigV4)──► RustFS: bucket gba
+celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)──► RustFS: bucket gba
         │                                                              roms/<id>.gba|gb|gbc
         └─ EmulatorJS 4.2.3 (núcleo mGBA, CDN)                         saves/<id>.sav
                                                                        saves-history/<id>/<data>.sav
@@ -34,8 +34,12 @@ celular / navegador ──(PIN → cookie HttpOnly)──► gba-api ──(SigV
 
 ## Login
 
-PIN de 6 dígitos. A API guarda só o hash scrypt (`PIN_SCRYPT`) e devolve um cookie de sessão
-assinado (HMAC, 30 dias, `HttpOnly; Secure; SameSite=Strict`). Contra força bruta: 5 erros por IP
+PIN de 6 dígitos. A API guarda só o hash scrypt (`PIN_SCRYPT`) e devolve um token de sessão
+assinado (HMAC, 30 dias), que o site guarda no `localStorage` e manda em `Authorization: Bearer`.
+Não é cookie porque o site (github.io) e a API (afonsolelis.tech) são sites diferentes e os
+navegadores bloqueiam cookie entre eles. "Sair" apaga o token do aparelho; para derrubar todas as
+sessões, troque `SESSION_SECRET` no Coolify. A API só aceita pedidos de navegador vindos de
+`https://afonsolelis.github.io` (`ALLOWED_ORIGINS`). Contra força bruta: 5 erros por IP
 bloqueiam o IP por 15 min; 20 erros em 1 h fecham o login para todos por 1 h.
 
 Trocar o PIN:
