@@ -442,6 +442,39 @@ async function play(file, version) {
     EJS_backgroundColor: '#14121f',
     EJS_language: 'pt-BR',
     EJS_disableDatabases: true,
+    // Teclado padrão do EmulatorJS, sem os atalhos 1/2/3 (quick save/quick load/slot):
+    // eles gravam só no navegador e brigavam com as teclas 1–5 da velocidade
+    // (apertar 2 para 2x carregava um estado antigo).
+    EJS_defaultControls: {
+      0: {
+        0: { value: 'x', value2: 'BUTTON_2' },        // B
+        1: { value: 's', value2: 'BUTTON_4' },
+        2: { value: 'v', value2: 'SELECT' },          // Select
+        3: { value: 'enter', value2: 'START' },       // Start
+        4: { value: 'up arrow', value2: 'DPAD_UP' },
+        5: { value: 'down arrow', value2: 'DPAD_DOWN' },
+        6: { value: 'left arrow', value2: 'DPAD_LEFT' },
+        7: { value: 'right arrow', value2: 'DPAD_RIGHT' },
+        8: { value: 'z', value2: 'BUTTON_1' },        // A
+        9: { value: 'a', value2: 'BUTTON_3' },
+        10: { value: 'q', value2: 'LEFT_TOP_SHOULDER' },   // L
+        11: { value: 'e', value2: 'RIGHT_TOP_SHOULDER' },  // R
+        12: { value: 'tab', value2: 'LEFT_BOTTOM_SHOULDER' },
+        13: { value: 'r', value2: 'RIGHT_BOTTOM_SHOULDER' },
+        14: { value: '', value2: 'LEFT_STICK' },
+        15: { value: '', value2: 'RIGHT_STICK' },
+        16: { value: 'h', value2: 'LEFT_STICK_X:+1' },
+        17: { value: 'f', value2: 'LEFT_STICK_X:-1' },
+        18: { value: 'g', value2: 'LEFT_STICK_Y:+1' },
+        19: { value: 't', value2: 'LEFT_STICK_Y:-1' },
+        20: { value: 'l', value2: 'RIGHT_STICK_X:+1' },
+        21: { value: 'j', value2: 'RIGHT_STICK_X:-1' },
+        22: { value: 'k', value2: 'RIGHT_STICK_Y:+1' },
+        23: { value: 'i', value2: 'RIGHT_STICK_Y:-1' },
+        24: {}, 25: {}, 26: {}, 27: {}, 28: {}, 29: {},
+      },
+      1: {}, 2: {}, 3: {},
+    },
     EJS_Buttons: {
       netplay: false,
       cacheManager: false,
@@ -455,6 +488,12 @@ async function play(file, version) {
     EJS_onGameStart: async () => {
       $('#loading').hidden = true;
       try { await pullSave(); } catch (e) { setSync(e.login ? 'faça login de novo' : '⚠ lake fora do ar: save não sincroniza', 'err'); }
+      // Controles salvos de antes ainda trazem os atalhos 1/2/3 (quick save/load/slot): limpa.
+      const ctl = window.EJS_emulator.controls?.[0];
+      if (ctl && [24, 25, 26].some(k => ctl[k]?.value)) {
+        for (const k of [24, 25, 26]) ctl[k] = {};
+        window.EJS_emulator.saveSettings();
+      }
       started = true;
       setInterval(pushSave, SAVE_EVERY_MS);
       // Sempre abre em 1x (o EmulatorJS lembraria o fast-forward da última vez).

@@ -30,6 +30,10 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   print da tela vira a capa do jogo na biblioteca.
 - **Velocidade:** botão `1x…5x` na barra do jogo (ou teclas 1–5). Usa o fast-forward do EmulatorJS,
   então o botão "Rápido" do gamepad virtual segue a mesma velocidade.
+- **Controles (teclado):** A = `Z`, B = `X`, L = `Q`, R = `E`, Start = `Enter`, Select = `V`, setas = direcional;
+  `1`–`5` = velocidade. Os atalhos 1/2/3 do EmulatorJS (quick save/load/slot) foram desligados: gravavam
+  só no navegador e brigavam com a velocidade. Dá para remapear no ícone de controle da barra do emulador
+  (vale por jogo, fica no navegador). Controle Bluetooth/USB funciona direto.
 - **Celular:** o EmulatorJS mostra os botões na tela sozinho em aparelhos touch. Dá para
   "Adicionar à tela inicial" e abrir em tela cheia (manifest PWA).
 - **ROMs novas:** botão `+ ROM` na biblioteca (vai para `roms/`). A ROM fica em cache no navegador
