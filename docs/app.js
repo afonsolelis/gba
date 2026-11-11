@@ -86,11 +86,25 @@ const META = {
   'pokemon-gold':                  ['Pokémon Gold', 'poke-gb', '#b48d1e'],
   'pokemon-silver':                ['Pokémon Silver', 'poke-gb', '#7f8a96'],
   'pokemon-crystal':               ['Pokémon Crystal', 'poke-gb', '#3a9cb3'],
+  // 4º campo (opcional): nome curto na capa
+  'castlevania-circle-of-the-moon':    ['Castlevania: Circle of the Moon', 'castlevania', '#5b1a2e', 'Circle of the Moon'],
+  'castlevania-harmony-of-dissonance': ['Castlevania: Harmony of Dissonance', 'castlevania', '#3b2a6b', 'Harmony of Dissonance'],
+  'castlevania-aria-of-sorrow':        ['Castlevania: Aria of Sorrow', 'castlevania', '#7a1f1f', 'Aria of Sorrow'],
+  'final-fantasy-1-2-dawn-of-souls':   ['Final Fantasy I & II: Dawn of Souls', 'ff', '#1d4f8f', 'I & II'],
+  'final-fantasy-4':                   ['Final Fantasy IV', 'ff', '#2b3f73', 'IV'],
+  'final-fantasy-tactics-advance':     ['Final Fantasy Tactics Advance', 'ff', '#8a5a1c', 'Tactics Advance'],
+  'sonic-advance':                     ['Sonic Advance', 'sonic', '#1f5fd1', 'Sonic Advance'],
+  'sonic-advance-3':                   ['Sonic Advance 3', 'sonic', '#1747a6', 'Sonic Advance 3'],
+  'teenage-mutant-ninja-turtles':      ['Teenage Mutant Ninja Turtles', 'acao', '#2f7d32', 'TMNT'],
 };
 const SHELVES = [
   ['poke-gba', 'Pokémon · Game Boy Advance'],
   ['zelda', 'Zelda · Game Boy Advance'],
   ['poke-gb', 'Pokémon · Game Boy / Color'],
+  ['castlevania', 'Castlevania · Game Boy Advance'],
+  ['ff', 'Final Fantasy · Game Boy Advance'],
+  ['sonic', 'Sonic · Game Boy Advance'],
+  ['acao', 'Ação · Game Boy Advance'],
   ['outros', 'Outros'],
 ];
 const SYS = { gba: 'GBA', gb: 'GB', gbc: 'GBC' };
@@ -103,7 +117,7 @@ const el = (tag, props = {}, ...kids) => {
 };
 
 function meta(id) {
-  if (META[id]) return { name: META[id][0], shelf: META[id][1], color: META[id][2] };
+  if (META[id]) return { name: META[id][0], shelf: META[id][1], color: META[id][2], short: META[id][3] };
   const name = id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
   let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
   return { name, shelf: 'outros', color: `hsl(${h} 45% 38%)` };
@@ -229,7 +243,7 @@ async function library() {
 
 function card(g) {
   const m = meta(g.id);
-  const short = m.name.replace(/^Pokémon (Pinball: )?|^Zelda: /, (x, p) => p ? 'Pinball ' : '').replace(/ & Four Swords| \(hack\)/, '');
+  const short = m.short || m.name.replace(/^Pokémon (Pinball: )?|^Zelda: /, (x, p) => p ? 'Pinball ' : '').replace(/ & Four Swords| \(hack\)/, '');
   const cover = el('div', { className: 'cover' }, el('span', { className: 'sys', textContent: SYS[g.ext] }));
   cover.style.setProperty('--c', m.color);
   if (g.shot) {
