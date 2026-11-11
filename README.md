@@ -4,8 +4,9 @@ Emulador de Game Boy Advance (e GB/GBC) no navegador, pensado para o celular, co
 login por PIN e saves sincronizados num bucket S3 (RustFS) na VPS.
 
 - **Site:** https://gba.afonsolelis.tech — `docs/` servido por nginx na VPS (serviço `site` do mesmo
-  compose; `api/deploy.sh` copia). Também publicado em https://afonsolelis.github.io/gba/ pelo
-  GitHub Pages (workflow `pages.yml`), que estava com erro interno do GitHub Actions em 11/11.
+  compose, config em `api/nginx.conf`; `api/deploy.sh` copia). O GitHub Pages foi despublicado em
+  11/11: o Actions dava `startup_failure` interno e o github.io ficou preso numa versão velha.
+  Para religar: Settings → Pages → Source "GitHub Actions" e `gh workflow enable pages.yml`.
 - **API:** https://gba-api.afonsolelis.tech — `api/server.mjs`, Node 22 sem dependências, no Coolify (projeto `gba`).
 - **Lake:** bucket `gba` no RustFS (`s3.afonsolelis.tech`), usuário `gba-app` com acesso só a esse bucket.
 
@@ -64,5 +65,5 @@ SESSION_SECRET=$GBA_SESSION_SECRET ALLOWED_ORIGINS=http://localhost:8000 PORT=87
 python3 -m http.server 8000 -d docs
 ```
 
-Deploy: `api/deploy.sh` (copia o `server.mjs` para `/data/gba/api` e o `docs/` para `/data/gba/site` na VPS e reinicia o serviço).
+Deploy: `api/deploy.sh` (copia `server.mjs` → `/data/gba/api`, `nginx.conf` → `/data/gba/nginx.conf` e `docs/` → `/data/gba/site` na VPS e reinicia o serviço). Mudou o `api/docker-compose.yml`? Mande para o Coolify (PATCH `docker_compose_raw`) antes.
 O compose do serviço está em `api/docker-compose.yml`.
