@@ -3,7 +3,9 @@
 Emulador de Game Boy Advance (e GB/GBC) no navegador, pensado para o celular, com
 login por PIN e saves sincronizados num bucket S3 (RustFS) na VPS.
 
-- **Site:** https://afonsolelis.github.io/gba/ — estático, publicado pelo GitHub Pages a partir de `docs/`.
+- **Site:** https://gba.afonsolelis.tech — `docs/` servido por nginx na VPS (serviço `site` do mesmo
+  compose; `api/deploy.sh` copia). Também publicado em https://afonsolelis.github.io/gba/ pelo
+  GitHub Pages (workflow `pages.yml`), que estava com erro interno do GitHub Actions em 11/11.
 - **API:** https://gba-api.afonsolelis.tech — `api/server.mjs`, Node 22 sem dependências, no Coolify (projeto `gba`).
 - **Lake:** bucket `gba` no RustFS (`s3.afonsolelis.tech`), usuário `gba-app` com acesso só a esse bucket.
 
@@ -39,7 +41,7 @@ assinado (HMAC, 30 dias), que o site guarda no `localStorage` e manda em `Author
 Não é cookie porque o site (github.io) e a API (afonsolelis.tech) são sites diferentes e os
 navegadores bloqueiam cookie entre eles. "Sair" apaga o token do aparelho; para derrubar todas as
 sessões, troque `SESSION_SECRET` no Coolify. A API só aceita pedidos de navegador vindos de
-`https://afonsolelis.github.io` (`ALLOWED_ORIGINS`). Contra força bruta: 5 erros por IP
+`https://gba.afonsolelis.tech` e `https://afonsolelis.github.io` (`ALLOWED_ORIGINS`). Contra força bruta: 5 erros por IP
 bloqueiam o IP por 15 min; 20 erros em 1 h fecham o login para todos por 1 h.
 
 Trocar o PIN:
@@ -62,5 +64,5 @@ SESSION_SECRET=$GBA_SESSION_SECRET ALLOWED_ORIGINS=http://localhost:8000 PORT=87
 python3 -m http.server 8000 -d docs
 ```
 
-Deploy da API: `api/deploy.sh` (copia o `server.mjs` para `/data/gba/api` na VPS e reinicia o serviço).
+Deploy: `api/deploy.sh` (copia o `server.mjs` para `/data/gba/api` e o `docs/` para `/data/gba/site` na VPS e reinicia o serviço).
 O compose do serviço está em `api/docker-compose.yml`.

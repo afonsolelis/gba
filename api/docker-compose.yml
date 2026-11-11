@@ -1,5 +1,7 @@
 # gba-api no Coolify (projeto gba). Sem build: node:22-alpine roda o
 # server.mjs que fica em /data/gba/api na VPS (copiado por api/deploy.sh).
+# `site` é um espelho do docs/ em https://gba.afonsolelis.tech (nginx servindo
+# /data/gba/site), além do GitHub Pages.
 # Segredos são variáveis do serviço no Coolify (cópia em ~/repos/hostinger/.env, GBA_*).
 services:
   api:
@@ -14,7 +16,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       PIN_SCRYPT: ${PIN_SCRYPT}
       SESSION_SECRET: ${SESSION_SECRET}
-      ALLOWED_ORIGINS: 'https://afonsolelis.github.io'
+      ALLOWED_ORIGINS: 'https://afonsolelis.github.io,https://gba.afonsolelis.tech'
       TZ: America/Sao_Paulo
     volumes:
       - '/data/gba/api:/app:ro'
@@ -22,6 +24,20 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  site:
+    image: 'nginx:1.29-alpine'
+    environment:
+      SERVICE_FQDN_SITE_80: ''
+    volumes:
+      - '/data/gba/site:/usr/share/nginx/html:ro'
+    mem_limit: 32m
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1/ >/dev/null || exit 1']
       interval: 30s
       timeout: 5s
       retries: 3
