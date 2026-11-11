@@ -10,6 +10,64 @@ const PIN_LEN = 6;
 const SAVE_EVERY_MS = 10_000;
 const MAX_SPEED = 5;
 
+// ---- Multiplicador de EXP (Pokémon de GBA)
+// Patch na ROM, aplicado na memória ao abrir o jogo (a ROM no lake não muda).
+// Em Cmd_getexp a EXP base é `expYield * level / 7` (movs r1,#7; bl __divsi3).
+// O bl passa a chamar uma "caverna" escrita sobre uma função de debug que o jogo
+// nunca chama (Debug_PrintStatus / UnusedPrintDecimalNum, endereços do pret):
+//   r0 = min(expYield * level * M / 7, 9700)
+// O teto existe porque o controlador da batalha trata a EXP como s16: 9700 × 1,5³
+// (troca, treinador, Lucky Egg) = 32737 < 32767. Antes de aplicar, confere os bytes
+// originais dos dois trechos; se não baterem (outra versão/hack), não aplica.
+// Gerado e testado (Unicorn, com o __divsi3 da própria ROM) por tools/exp_patch.py.
+const EXP_PATCHES = {
+  BPEE: { // Emerald
+    site: 0x04a4ae, siteOrig: '9df247f8', sitePatch: 'c7f7f5fe',
+    cave: 0x01229c, litM: 0x0122b4,
+    caveOrig: 'f0b5474680b4f8f755f90006000e1c2113220223fcf7a6f92d4c206880781421',
+    cavePatch: '00b5054a5043d5f24df90449884200d9084602bc084700bfe8030000e4250000' },
+  BPRE: { // FireRed (e hacks com os mesmos bytes)
+    site: 0x021bea, siteOrig: 'c2f115fa', sitePatch: 'daf01dfb',
+    cave: 0x0fc228, litM: 0x0fc240,
+    caveOrig: 'f0b5474680b40ef75df90006000e1c2113220223fcf7daf92d4c206880781421',
+    cavePatch: '00b5054a5043e7f0f3fe0449884200d9084602bc084700bfe8030000e4250000' },
+  BPGE: { // LeafGreen
+    site: 0x021bea, siteOrig: 'c2f103fa', sitePatch: 'daf009fb',
+    cave: 0x0fc200, litM: 0x0fc218,
+    caveOrig: 'f0b5474680b40ef771f90006000e1c2113220223fcf7daf92d4c206880781421',
+    cavePatch: '00b5054a5043e7f0f5fe0449884200d9084602bc084700bfe8030000e4250000' },
+  AXVE: { // Ruby
+    site: 0x020192, siteOrig: 'c0f169fb', sitePatch: '71f007f9',
+    cave: 0x0913a4, litM: 0x0913bc,
+    caveOrig: 'f0b582b00004040c09060f0e1206160e0025fa218900201c4ff168fd0006000e',
+    cavePatch: '00b5054a50434ff15dfa0449884200d9084602bc084700bfe8030000e4250000' },
+  AXPE: { // Sapphire
+    site: 0x020192, siteOrig: 'c0f131fb', sitePatch: '71f007f9',
+    cave: 0x0913a4, litM: 0x0913bc,
+    caveOrig: 'f0b582b00004040c09060f0e1206160e0025fa218900201c4ff130fd0006000e',
+    cavePatch: '00b5054a50434ff125fa0449884200d9084602bc084700bfe8030000e4250000' },
+};
+const EXP_OPTIONS = [1, 10, 100, 1000];
+const expKey = (id) => `gba-exp-${id}`;
+const getExpMult = (id) => { try { return Number(localStorage.getItem(expKey(id))) || 1; } catch { return 1; } };
+const setExpMult = (id, n) => { try { n > 1 ? localStorage.setItem(expKey(id), String(n)) : localStorage.removeItem(expKey(id)); } catch { /* sem storage */ } };
+
+const hexBytes = (h) => Uint8Array.from(h.match(/../g), b => parseInt(b, 16));
+const sameBytes = (rom, off, hex) => hexBytes(hex).every((b, i) => rom[off + i] === b);
+
+// Devolve { rom, available }: available = o patch serve para esta ROM.
+async function applyExpPatch(blob, mult) {
+  const rom = new Uint8Array(await blob.arrayBuffer());
+  const code = String.fromCharCode(...rom.subarray(0xac, 0xb0));
+  const p = EXP_PATCHES[code];
+  const available = !!p && sameBytes(rom, p.site, p.siteOrig) && sameBytes(rom, p.cave, p.caveOrig);
+  if (!available || mult <= 1) return { rom: blob, available };
+  rom.set(hexBytes(p.sitePatch), p.site);
+  rom.set(hexBytes(p.cavePatch), p.cave);
+  new DataView(rom.buffer).setUint32(p.litM, mult, true);
+  return { rom: new Blob([rom]), available };
+}
+
 // Nome, prateleira e cor de cada jogo (o resto cai em "Outros" com nome gerado do arquivo).
 const META = {
   'pokemon-ruby':                  ['Pokémon Ruby', 'poke-gba', '#b8302a'],
@@ -279,6 +337,24 @@ async function play(file, version) {
     $('#loading-msg').textContent = 'Não consegui baixar a ROM.';
     return;
   }
+  // ---- multiplicador de EXP (só nos Pokémon de GBA onde o patch confere)
+  const expMult = getExpMult(id);
+  const patched = await applyExpPatch(rom, expMult);
+  rom = patched.rom;
+  const expSel = $('#exp');
+  if (patched.available) {
+    expSel.replaceChildren(...EXP_OPTIONS.map(n => el('option', { value: n, textContent: `EXP ${n}x`, selected: n === expMult })));
+    expSel.classList.toggle('fast', expMult > 1);
+    expSel.hidden = false;
+    expSel.onchange = async () => {
+      // O patch entra quando a ROM carrega: salva no lake e reabre o jogo.
+      expSel.disabled = true;
+      setExpMult(id, Number(expSel.value));
+      await pushSave();
+      location.reload();
+    };
+  }
+
   $('#loading-msg').textContent = 'Iniciando emulador…';
   $('#progress').style.width = '100%';
 

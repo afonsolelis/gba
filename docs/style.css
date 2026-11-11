@@ -164,6 +164,21 @@ body {
   color: var(--ink);
 }
 .playbar .speed.fast { background: #f97316; color: #fff; }
+.playbar .expsel {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--pixel);
+  font-size: 9px;
+  padding: 9px 8px;
+  max-width: 110px;
+}
+.playbar .expsel.fast { background: #16a34a; color: #fff; }
+@media (max-width: 420px) {
+  .playbar { gap: 6px; padding-left: 6px; padding-right: 6px; }
+  .playbar .pill { max-width: 74px; overflow: hidden; text-overflow: ellipsis; }
+}
 .playbar .speed:disabled { opacity: .4; }
 .playbar .title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pill {

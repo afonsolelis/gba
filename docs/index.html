@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <!-- Login -->
@@ -49,6 +49,7 @@
     <header class="playbar">
       <button class="btn ghost" id="back" aria-label="Voltar para a biblioteca">‹ Jogos</button>
       <span class="title" id="play-title"></span>
+      <select class="btn expsel" id="exp" aria-label="Multiplicador de EXP" hidden></select>
       <button class="btn speed" id="speed" aria-label="Velocidade do jogo" disabled>1x</button>
       <span class="pill" id="sync">…</span>
     </header>
@@ -61,6 +62,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=3" type="module"></script>
+  <script src="app.js?v=4" type="module"></script>
 </body>
 </html>
