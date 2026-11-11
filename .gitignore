@@ -1,0 +1,7 @@
+*.gba
+*.gb
+*.gbc
+*.sav
+*.state
+.env
+node_modules/

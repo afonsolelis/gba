@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#14121f">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>GBA</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <!-- Login -->
+  <section id="login" class="view" hidden>
+    <div class="login-box">
+      <h1 class="logo">GBA</h1>
+      <p class="hint" id="login-msg">Digite o PIN</p>
+      <div class="dots" id="dots" aria-live="polite"></div>
+      <div class="keypad" id="keypad"></div>
+    </div>
+  </section>
+
+  <!-- Biblioteca -->
+  <section id="library" class="view" hidden>
+    <header class="topbar">
+      <h1 class="logo small">GBA</h1>
+      <div class="actions">
+        <label class="btn" title="Adicionar ROM">
+          <input type="file" id="upload" accept=".gba,.gb,.gbc" multiple hidden>
+          + ROM
+        </label>
+        <button class="btn ghost" id="logout" title="Sair">Sair</button>
+      </div>
+    </header>
+    <p class="status" id="lib-status"></p>
+    <div id="shelves"></div>
+  </section>
+
+  <!-- Jogo -->
+  <section id="play" class="view" hidden>
+    <header class="playbar">
+      <button class="btn ghost" id="back" aria-label="Voltar para a biblioteca">‹ Jogos</button>
+      <span class="title" id="play-title"></span>
+      <button class="btn speed" id="speed" aria-label="Velocidade do jogo" disabled>1x</button>
+      <span class="pill" id="sync">…</span>
+    </header>
+    <div id="stage">
+      <div id="loading">
+        <div class="bar"><div id="progress"></div></div>
+        <p id="loading-msg">Carregando…</p>
+      </div>
+      <div id="game"></div>
+    </div>
+  </section>
+
+  <script src="app.js?v=2" type="module"></script>
+</body>
+</html>
