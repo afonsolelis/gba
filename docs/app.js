@@ -8,7 +8,8 @@ const API = location.hostname === 'localhost' || location.hostname === '127.0.0.
 const EJS_DATA = 'https://cdn.emulatorjs.org/4.2.3/data/';
 const PIN_LEN = 6;
 const SAVE_EVERY_MS = 10_000;
-const MAX_SPEED = 5;
+// Velocidades do botão (o EmulatorJS aceita ff-ratio até 10.0); no teclado, 1–9 e 0 = 10x.
+const SPEEDS = [1, 2, 3, 4, 5, 10];
 
 // ---- Multiplicador de EXP (Pokémon de GBA)
 // Patch na ROM, aplicado na memória ao abrir o jogo (a ROM no lake não muda).
@@ -443,7 +444,7 @@ async function play(file, version) {
     EJS_language: 'pt-BR',
     EJS_disableDatabases: true,
     // Teclado padrão do EmulatorJS, sem os atalhos 1/2/3 (quick save/quick load/slot):
-    // eles gravam só no navegador e brigavam com as teclas 1–5 da velocidade
+    // eles gravam só no navegador e brigavam com as teclas 0–9 da velocidade
     // (apertar 2 para 2x carregava um estado antigo).
     EJS_defaultControls: {
       0: {
@@ -527,7 +528,7 @@ async function play(file, version) {
     },
   });
 
-  // ---- velocidade: 1x → 2x → 3x → 4x → 5x (usa o fast-forward do próprio EmulatorJS,
+  // ---- velocidade: 1x → 2x → 3x → 4x → 5x → 10x (usa o fast-forward do próprio EmulatorJS,
   // então o botão "Rápido" do gamepad virtual também passa a usar a velocidade escolhida)
   const speedBtn = $('#speed');
   let speed = 1;
@@ -544,10 +545,10 @@ async function play(file, version) {
     speedBtn.textContent = `${n}x`;
     speedBtn.classList.toggle('fast', n > 1);
   };
-  speedBtn.onclick = () => setSpeed(speed >= MAX_SPEED ? 1 : speed + 1);
+  speedBtn.onclick = () => setSpeed(SPEEDS.find(n => n > speed) ?? 1);
   addEventListener('keydown', (e) => {
-    // Teclas 1–5 no teclado escolhem a velocidade direto.
-    if (started && /^[1-5]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) setSpeed(Number(e.key));
+    // Teclas 1–9 escolhem a velocidade direto; 0 = 10x.
+    if (started && /^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) setSpeed(Number(e.key) || 10);
   });
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) pushSave(); });

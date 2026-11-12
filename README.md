@@ -28,7 +28,7 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   Se não conseguir ler o save do lake, o site não envia nada (para não sobrescrever o progresso).
 - **Savestate:** os botões de salvar/carregar estado do EmulatorJS gravam no lake (um por jogo) e o
   print da tela vira a capa do jogo na biblioteca.
-- **Velocidade:** botão `1x…5x` na barra do jogo (ou teclas 1–5). Usa o fast-forward do EmulatorJS,
+- **Velocidade:** botão `1x…5x → 10x` na barra do jogo (ou teclas 1–9, e 0 = 10x). Usa o fast-forward do EmulatorJS,
   então o botão "Rápido" do gamepad virtual segue a mesma velocidade.
 - **Controles (teclado):** A = `Z`, B = `X`, L = `Q`, R = `E`, Start = `Enter`, Select = `V`, setas = direcional;
   `1`–`5` = velocidade. Os atalhos 1/2/3 do EmulatorJS (quick save/load/slot) foram desligados: gravavam
