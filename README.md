@@ -1,6 +1,6 @@
 # GBA
 
-Emulador de Game Boy Advance (e GB/GBC) no navegador, pensado para o celular, com
+Emulador de Game Boy Advance (e GB/GBC e Nintendo 64) no navegador, pensado para o celular, com
 login por PIN e saves sincronizados num bucket S3 (RustFS) na VPS.
 
 - **Site:** https://gba.afonsolelis.tech — `docs/` servido por nginx na VPS (serviço `site` do mesmo
@@ -16,8 +16,8 @@ Este repositório não tem ROM, save nem segredo: tudo isso fica no bucket, atr�
 
 ```
 celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)──► RustFS: bucket gba
-        │                                                              roms/<id>.gba|gb|gbc
-        └─ EmulatorJS 4.2.3 (núcleo mGBA, CDN)                         saves/<id>.sav
+        │                                                              roms/<id>.gba|gb|gbc|z64|n64|v64
+        └─ EmulatorJS 4.2.3 (mGBA / mupen64plus_next, CDN)             saves/<id>.sav
                                                                        saves-history/<id>/<data>.sav
                                                                        states/<id>.state + .png
 ```
@@ -36,7 +36,12 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   (vale por jogo, fica no navegador). Controle Bluetooth/USB funciona direto.
 - **Celular:** o EmulatorJS mostra os botões na tela sozinho em aparelhos touch. Dá para
   "Adicionar à tela inicial" e abrir em tela cheia (manifest PWA).
-- **ROMs novas:** botão `+ ROM` na biblioteca (vai para `roms/`). A ROM fica em cache no navegador
+- **Nintendo 64:** ROMs `.z64`/`.n64`/`.v64` usam o núcleo `n64` (mupen64plus_next) e vão para a
+  prateleira "Nintendo 64". Teclado: analógico = setas, A = `Z`, B = `X`, Z (gatilho) = `Shift`,
+  L = `Q`, R = `E`, Start = `Enter`, botões C = `I`/`J`/`K`/`L`, direcional = `T`/`F`/`G`/`H`.
+  Savestate de N64 é grande (vários MB; o limite da API é 48 MB).
+- **ROMs novas:** botão `+ ROM` na biblioteca (vai para `roms/`). Aceita `.zip`: o site descompacta
+  no navegador e envia a primeira ROM de dentro. A ROM fica em cache no navegador
   depois do primeiro download.
 
 ## Login

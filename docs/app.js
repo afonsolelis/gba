@@ -97,6 +97,7 @@ const META = {
   'sonic-advance':                     ['Sonic Advance', 'sonic', '#1f5fd1', 'Sonic Advance'],
   'sonic-advance-3':                   ['Sonic Advance 3', 'sonic', '#1747a6', 'Sonic Advance 3'],
   'teenage-mutant-ninja-turtles':      ['Teenage Mutant Ninja Turtles', 'acao', '#2f7d32', 'TMNT'],
+  'super-mario-64':                    ['Super Mario 64', 'n64', '#c62828', 'Mario 64'],
 };
 const SHELVES = [
   ['poke-gba', 'Pokémon · Game Boy Advance'],
@@ -106,9 +107,12 @@ const SHELVES = [
   ['ff', 'Final Fantasy · Game Boy Advance'],
   ['sonic', 'Sonic · Game Boy Advance'],
   ['acao', 'Ação · Game Boy Advance'],
+  ['n64', 'Nintendo 64'],
   ['outros', 'Outros'],
 ];
-const SYS = { gba: 'GBA', gb: 'GB', gbc: 'GBC' };
+const SYS = { gba: 'GBA', gb: 'GB', gbc: 'GBC', n64: 'N64', z64: 'N64', v64: 'N64' };
+const ROM_EXT = /\.(gba|gb|gbc|n64|z64|v64)$/;
+const isN64 = (ext) => SYS[ext] === 'N64';
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => {
@@ -232,7 +236,7 @@ async function library() {
   const shelves = $('#shelves');
   shelves.replaceChildren();
   for (const [key, title] of SHELVES) {
-    const list = games.filter(g => meta(g.id).shelf === key)
+    const list = games.filter(g => (META[g.id] ? meta(g.id).shelf : isN64(g.ext) ? 'n64' : 'outros') === key)
       .sort((a, b) => (b.save?.modified || '').localeCompare(a.save?.modified || '') || meta(a.id).name.localeCompare(meta(b.id).name));
     if (!list.length) continue;
     shelves.append(el('section', { className: 'shelf' },
@@ -273,11 +277,47 @@ $('#logout').onclick = () => {
   location.href = './';
 };
 
+// Lê o primeiro arquivo de ROM de um .zip (sem biblioteca: diretório central +
+// DecompressionStream). Dumps antigos de N64 costumam vir zipados.
+async function unzipRom(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const dv = new DataView(buf.buffer);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('zip inválido');
+  let p = dv.getUint32(eocd + 16, true);
+  const count = dv.getUint16(eocd + 10, true);
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true), extraLen = dv.getUint16(p + 30, true), commLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commLen;
+    if (!ROM_EXT.test(name.toLowerCase())) continue;
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const data = buf.subarray(start, start + csize);
+    const base = name.split('/').pop();
+    if (method === 0) return new File([data], base);
+    if (method !== 8) throw new Error('compressão do zip não suportada');
+    const out = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new File([await new Response(out).blob()], base);
+  }
+  throw new Error('nenhuma ROM dentro do zip');
+}
+
 $('#upload').onchange = async (e) => {
   const status = $('#lib-status');
-  for (const f of e.target.files) {
-    const m = f.name.toLowerCase().match(/^(.*)\.(gba|gb|gbc)$/);
-    if (!m) { status.textContent = `${f.name}: só .gba, .gb ou .gbc`; continue; }
+  for (let f of e.target.files) {
+    if (/\.zip$/i.test(f.name)) {
+      status.textContent = `Descompactando ${f.name}…`;
+      try { f = await unzipRom(f); } catch (err) { status.textContent = `${f.name}: ${err.message}`; continue; }
+    }
+    const m = f.name.toLowerCase().match(/^(.*)\.(gba|gb|gbc|n64|z64|v64)$/);
+    if (!m) { status.textContent = `${f.name}: só .gba, .gb, .gbc, .z64, .n64, .v64 ou .zip`; continue; }
     const id = m[1].normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\([^)]*\)|\[[^\]]*\]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'rom';
     await new Promise((resolve) => {
@@ -334,8 +374,36 @@ async function fetchRom(file, version) {
   return blob;
 }
 
+// Teclado do N64 (núcleo mupen64plus_next): analógico nas setas (o Mario precisa dele),
+// A = Z, B = X, Z (gatilho) = Shift, L = Q, R = E, Start = Enter, botões C = I/J/K/L,
+// direcional digital = T/F/G/H. Sem os atalhos 1/2/3 do EmulatorJS (ficam para a velocidade).
+const N64_CONTROLS = {
+  0: {
+    0: { value: 'z', value2: 'BUTTON_2' },              // A
+    1: { value: 'x', value2: 'BUTTON_4' },              // B
+    3: { value: 'enter', value2: 'START' },             // Start
+    4: { value: 't', value2: 'DPAD_UP' },
+    5: { value: 'g', value2: 'DPAD_DOWN' },
+    6: { value: 'f', value2: 'DPAD_LEFT' },
+    7: { value: 'h', value2: 'DPAD_RIGHT' },
+    10: { value: 'q', value2: 'LEFT_TOP_SHOULDER' },    // L
+    11: { value: 'e', value2: 'RIGHT_TOP_SHOULDER' },   // R
+    12: { value: 'shift', value2: 'LEFT_BOTTOM_SHOULDER' }, // Z
+    16: { value: 'right arrow', value2: 'LEFT_STICK_X:+1' },
+    17: { value: 'left arrow', value2: 'LEFT_STICK_X:-1' },
+    18: { value: 'down arrow', value2: 'LEFT_STICK_Y:+1' },
+    19: { value: 'up arrow', value2: 'LEFT_STICK_Y:-1' },
+    20: { value: 'l', value2: 'RIGHT_STICK_X:+1' },     // C →
+    21: { value: 'j', value2: 'RIGHT_STICK_X:-1' },     // C ←
+    22: { value: 'k', value2: 'RIGHT_STICK_Y:+1' },     // C ↓
+    23: { value: 'i', value2: 'RIGHT_STICK_Y:-1' },     // C ↑
+    24: {}, 25: {}, 26: {}, 27: {}, 28: {}, 29: {},
+  },
+  1: {}, 2: {}, 3: {},
+};
+
 async function play(file, version) {
-  const m0 = file.match(/^([a-z0-9-]+)\.(gba|gb|gbc)$/);
+  const m0 = file.match(/^([a-z0-9-]+)\.(gba|gb|gbc|n64|z64|v64)$/);
   if (!m0) { location.href = './'; return; }
   const [, id, ext] = m0;
   const m = meta(id);
@@ -354,7 +422,7 @@ async function play(file, version) {
   }
   // ---- multiplicador de EXP (só nos Pokémon de GBA onde o patch confere)
   const expMult = getExpMult(id);
-  const patched = await applyExpPatch(rom, expMult);
+  const patched = ext === 'gba' ? await applyExpPatch(rom, expMult) : { rom, available: false };
   rom = patched.rom;
   const expSel = $('#exp');
   if (patched.available) {
@@ -434,7 +502,7 @@ async function play(file, version) {
   // ---- EmulatorJS
   Object.assign(window, {
     EJS_player: '#game',
-    EJS_core: ext === 'gba' ? 'gba' : 'gb',
+    EJS_core: isN64(ext) ? 'n64' : ext === 'gba' ? 'gba' : 'gb',
     EJS_gameUrl: URL.createObjectURL(rom),
     EJS_gameName: id,
     EJS_pathtodata: EJS_DATA,
@@ -446,7 +514,7 @@ async function play(file, version) {
     // Teclado padrão do EmulatorJS, sem os atalhos 1/2/3 (quick save/quick load/slot):
     // eles gravam só no navegador e brigavam com as teclas 0–9 da velocidade
     // (apertar 2 para 2x carregava um estado antigo).
-    EJS_defaultControls: {
+    EJS_defaultControls: isN64(ext) ? N64_CONTROLS : {
       0: {
         0: { value: 'x', value2: 'BUTTON_2' },        // B
         1: { value: 's', value2: 'BUTTON_4' },
