@@ -2,7 +2,7 @@
 // do RustFS. Só a biblioteca padrão do Node (>= 22): sem npm install.
 //
 // Layout do bucket:
-//   roms/<id>.<gba|gb|gbc|n64|z64|v64>      ROMs
+//   roms/<id>.<gba|gb|gbc|n64|z64|v64|nds>      ROMs
 //   saves/<id>.sav                          SRAM (save do jogo), sincronizado sozinho
 //   saves-history/<id>/<iso>.sav            cópia de segurança, no máximo 1 a cada 15 min
 //   states/<id>.state + states/<id>.png     savestate manual + print da tela
@@ -35,8 +35,10 @@ for (const [k, v] of Object.entries({ S3_ACCESS_KEY: AK, S3_SECRET_KEY: SK, SESS
 }
 
 const ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
-const ROM = /^([a-z0-9][a-z0-9-]{0,79})\.(gba|gb|gbc|n64|z64|v64)$/;
+const ROM = /^([a-z0-9][a-z0-9-]{0,79})\.(gba|gb|gbc|n64|z64|v64|nds)$/;
 // Savestate de N64 (mupen64plus) passa de 8 MB; o de GBA fica em ~400 KB.
+// PUT /rom junta o corpo na memória (container de 128 MB): ROM de DS maior que isso
+// (Black/White, HGSS…) vai direto para o bucket, não pelo botão "+ ROM".
 const LIMITS = { rom: 64 << 20, save: 1 << 20, state: 48 << 20, shot: 1 << 20 };
 
 // ---------------------------------------------------------------- S3 (SigV4)
@@ -221,7 +223,7 @@ const routes = {
     await proxyGet(res, `roms/${arg}`, 'application/octet-stream', 'private, max-age=604800');
   },
   'PUT /rom': async (req, res, arg) => {
-    if (!ROM.test(arg)) return send(res, 400, 'nome inválido (use letras minúsculas, números e hífen; .gba/.gb/.gbc/.n64/.z64/.v64)');
+    if (!ROM.test(arg)) return send(res, 400, 'nome inválido (use letras minúsculas, números e hífen; .gba/.gb/.gbc/.n64/.z64/.v64/.nds)');
     await put(`roms/${arg}`, await readBody(req, LIMITS.rom));
     send(res, 200, { ok: true });
   },

@@ -98,6 +98,15 @@ const META = {
   'sonic-advance-3':                   ['Sonic Advance 3', 'sonic', '#1747a6', 'Sonic Advance 3'],
   'teenage-mutant-ninja-turtles':      ['Teenage Mutant Ninja Turtles', 'acao', '#2f7d32', 'TMNT'],
   'super-mario-64':                    ['Super Mario 64', 'n64', '#c62828', 'Mario 64'],
+  'pokemon-diamond':                   ['Pokémon Diamond', 'poke-ds', '#3d6fb5', 'Diamond'],
+  'pokemon-pearl':                     ['Pokémon Pearl', 'poke-ds', '#b5577a', 'Pearl'],
+  'pokemon-platinum':                  ['Pokémon Platinum', 'poke-ds', '#6b6f7a', 'Platinum'],
+  'pokemon-heartgold':                 ['Pokémon HeartGold', 'poke-ds', '#c19a1b', 'HeartGold'],
+  'pokemon-soulsilver':                ['Pokémon SoulSilver', 'poke-ds', '#8a97a8', 'SoulSilver'],
+  'pokemon-black':                     ['Pokémon Black', 'poke-ds', '#26262c', 'Black'],
+  'pokemon-white':                     ['Pokémon White', 'poke-ds', '#9aa3ad', 'White'],
+  'pokemon-black-2':                   ['Pokémon Black 2', 'poke-ds', '#1f2a3a', 'Black 2'],
+  'pokemon-white-2':                   ['Pokémon White 2', 'poke-ds', '#a88f8f', 'White 2'],
 };
 const SHELVES = [
   ['poke-gba', 'Pokémon · Game Boy Advance'],
@@ -107,11 +116,13 @@ const SHELVES = [
   ['ff', 'Final Fantasy · Game Boy Advance'],
   ['sonic', 'Sonic · Game Boy Advance'],
   ['acao', 'Ação · Game Boy Advance'],
+  ['poke-ds', 'Pokémon · Nintendo DS'],
   ['n64', 'Nintendo 64'],
+  ['nds', 'Nintendo DS'],
   ['outros', 'Outros'],
 ];
-const SYS = { gba: 'GBA', gb: 'GB', gbc: 'GBC', n64: 'N64', z64: 'N64', v64: 'N64' };
-const ROM_EXT = /\.(gba|gb|gbc|n64|z64|v64)$/;
+const SYS = { gba: 'GBA', gb: 'GB', gbc: 'GBC', n64: 'N64', z64: 'N64', v64: 'N64', nds: 'DS' };
+const ROM_EXT = /\.(gba|gb|gbc|n64|z64|v64|nds)$/;
 const isN64 = (ext) => SYS[ext] === 'N64';
 
 const $ = (s) => document.querySelector(s);
@@ -236,7 +247,7 @@ async function library() {
   const shelves = $('#shelves');
   shelves.replaceChildren();
   for (const [key, title] of SHELVES) {
-    const list = games.filter(g => (META[g.id] ? meta(g.id).shelf : isN64(g.ext) ? 'n64' : 'outros') === key)
+    const list = games.filter(g => (META[g.id] ? meta(g.id).shelf : isN64(g.ext) ? 'n64' : g.ext === 'nds' ? 'nds' : 'outros') === key)
       .sort((a, b) => (b.save?.modified || '').localeCompare(a.save?.modified || '') || meta(a.id).name.localeCompare(meta(b.id).name));
     if (!list.length) continue;
     shelves.append(el('section', { className: 'shelf' },
@@ -316,8 +327,8 @@ $('#upload').onchange = async (e) => {
       status.textContent = `Descompactando ${f.name}…`;
       try { f = await unzipRom(f); } catch (err) { status.textContent = `${f.name}: ${err.message}`; continue; }
     }
-    const m = f.name.toLowerCase().match(/^(.*)\.(gba|gb|gbc|n64|z64|v64)$/);
-    if (!m) { status.textContent = `${f.name}: só .gba, .gb, .gbc, .z64, .n64, .v64 ou .zip`; continue; }
+    const m = f.name.toLowerCase().match(/^(.*)\.(gba|gb|gbc|n64|z64|v64|nds)$/);
+    if (!m) { status.textContent = `${f.name}: só .gba, .gb, .gbc, .z64, .n64, .v64, .nds ou .zip`; continue; }
     const id = m[1].normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\([^)]*\)|\[[^\]]*\]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'rom';
     await new Promise((resolve) => {
@@ -403,7 +414,7 @@ const N64_CONTROLS = {
 };
 
 async function play(file, version) {
-  const m0 = file.match(/^([a-z0-9-]+)\.(gba|gb|gbc|n64|z64|v64)$/);
+  const m0 = file.match(/^([a-z0-9-]+)\.(gba|gb|gbc|n64|z64|v64|nds)$/);
   if (!m0) { location.href = './'; return; }
   const [, id, ext] = m0;
   const m = meta(id);
@@ -502,7 +513,7 @@ async function play(file, version) {
   // ---- EmulatorJS
   Object.assign(window, {
     EJS_player: '#game',
-    EJS_core: isN64(ext) ? 'n64' : ext === 'gba' ? 'gba' : 'gb',
+    EJS_core: isN64(ext) ? 'n64' : ext === 'nds' ? 'nds' : ext === 'gba' ? 'gba' : 'gb',
     EJS_gameUrl: URL.createObjectURL(rom),
     EJS_gameName: id,
     EJS_pathtodata: EJS_DATA,
