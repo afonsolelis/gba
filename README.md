@@ -34,7 +34,9 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   Sapphire, Emerald, FireRed, LeafGreen) e de GB/GBC (Red, Blue, Yellow, Gold, Silver, Crystal 1.1).
   É um patch na ROM aplicado na memória ao abrir (a ROM do lake não muda), só quando os bytes
   originais conferem; a escolha fica no navegador. Gerados e testados por `tools/exp_patch.py` (GBA,
-  Unicorn) e `tools/exp_patch_gb.py` (GB/GBC, PyBoy). Green (japonês) e os de DS não têm.
+  Unicorn) e `tools/exp_patch_gb.py` (GB/GBC, PyBoy). Green (japonês) não tem.
+  Nos de DS (Diamond a White 2, versões US) é um código de Action Replay passado ao emulador
+  (`EJS_cheats`), da libretro-database: x2/x8/x64/x1024 (Black 2/White 2: x2/x10/x100/x200).
 - **Controles (teclado):** A = `Z`, B = `X`, L = `Q`, R = `E`, Start = `Enter`, Select = `V`, setas = direcional;
   `1`–`5` = velocidade. Os atalhos 1/2/3 do EmulatorJS (quick save/load/slot) foram desligados: gravavam
   só no navegador e brigavam com a velocidade. Dá para remapear no ícone de controle da barra do emulador
@@ -45,11 +47,14 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   prateleira "Nintendo 64". Teclado: analógico = setas, A = `Z`, B = `X`, Z (gatilho) = `Shift`,
   L = `Q`, R = `E`, Start = `Enter`, botões C = `I`/`J`/`K`/`L`, direcional = `T`/`F`/`G`/`H`.
   Savestate de N64 é grande (vários MB; o limite da API é 48 MB).
-- **Nintendo DS:** ROMs `.nds` usam o núcleo `nds` (melonDS) e vão para a prateleira "Nintendo DS"
-  (os Pokémon, para "Pokémon · Nintendo DS"). As duas telas ficam lado a lado (`melonds_screen_layout:
-  Left/Right`; dá para trocar em Ajustes → Screen Layout); a de toque responde ao mouse/dedo. Teclado: A = `Z`, B = `X`, X = `A`, Y = `S`, L = `Q`, R = `E`. ROMs de DS passam de
-  100 MB e o `PUT /rom` da API junta tudo na memória (container de 128 MB): suba as grandes direto no
-  bucket (`roms/<id>.nds`), não pelo `+ ROM`.
+- **Nintendo DS:** ROMs `.nds` rodam no núcleo `desmume2015` (DeSmuME) e vão para a prateleira
+  "Nintendo DS" (os Pokémon, para "Pokémon · Nintendo DS"). Não é o melonDS porque ele roda cheat
+  uma vez só, e o multiplicador de EXP precisa ser reaplicado a cada quadro. Não troque de núcleo
+  depois de ter save: o formato não é garantido entre os dois. As telas ficam lado a lado
+  (`desmume_screens_layout: left/right`; troca em Ajustes → Backend Core Options → "desmume screens
+  layout"); a de toque responde ao mouse/dedo. Teclado: A = `Z`, B = `X`, X = `A`, Y = `S`, L = `Q`,
+  R = `E`. ROMs de DS passam de 100 MB e o `PUT /rom` da API junta tudo na memória (container de
+  128 MB): suba as grandes direto no bucket (`roms/<id>.nds`), não pelo `+ ROM`.
 - **ROMs novas:** botão `+ ROM` na biblioteca (vai para `roms/`). Aceita `.zip`: o site descompacta
   no navegador e envia a primeira ROM de dentro. A ROM fica em cache no navegador
   depois do primeiro download.

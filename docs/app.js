@@ -83,6 +83,48 @@ const EXP_PATCHES_GB = {
     cavePatch: 'c5d5e5cd24313e01e0b7cd19313e01e0b7cd1931f0b3a7200bf0b4a72006f0b5fe4b38083e4ae0b53effe0b6afe0b3e0b4e1d1c1c9' },
 };
 const GB_FACTORS = { 10: [10, 1], 100: [100, 1], 1000: [10, 100] };
+// ---- Multiplicador de EXP (Pokémon de DS): códigos de Action Replay (versões US)
+// Não dá para patchar a ROM como no GBA/GB (o código de batalha vem num overlay comprimido
+// que o jogo recarrega), então vai como cheat. Só funciona no DeSmuME (desmume2015): o
+// melonDS do EmulatorJS roda o cheat uma vez só, ao ligar, e a batalha recarregada o apaga.
+// Fonte: libretro-database, cht/Nintendo - Nintendo DS (do banco do DeadSkullzJr); White
+// confere com o Almar's Guides e Black 2 com o SuperCheats. Os códigos conferem a instrução
+// original antes de escrever (outra revisão da ROM = não faz nada). Chave: código do jogo
+// no cabeçalho (0x0C). Gen 4 e Black/White multiplicam por shift (potências de 2);
+// Black 2/White 2 por um byte (x2–x255).
+const hex8 = (n) => (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+const shiftOp = (base, m) => hex8(base | (Math.log2(m) << 6));
+const gen4 = (a, b, c, end) => ({ opts: [1, 2, 8, 64, 1024],
+  code: (m) => `${a} 0000319C ${b} ${shiftOp(0x60080000, m)} ${c} 309C1C28 ${end} 00000000` });
+const gen5 = (site, bl) => ({ opts: [1, 2, 8, 64, 1024],
+  code: (m) => `5${site} 59A8437E 023AE840 59A8437E 023AE844 ${shiftOp(0x51A80000, m)} 123AE848 00004770 0${site} ${bl} D2000000 00000000` });
+const gen5b = (a) => ({ opts: [1, 2, 10, 100, 200],
+  code: (m) => `5${a} 18080C09 0${(parseInt(a, 16) + 4).toString(16).toUpperCase()} ${hex8(0x43442400 | m)} D2000000 00000000` });
+const EXP_CHEATS_DS = {
+  ADAE: gen4('92233A46', '02233A48', '02233A4C', 'D2000000'), // Diamond
+  APAE: gen4('92233A46', '02233A48', '02233A4C', 'D2000000'), // Pearl
+  CPUE: gen4('92241E7E', '02241E80', '02241E84', 'D0000000'), // Platinum
+  IPKE: gen4('9223E7EA', '0223E7EC', '0223E7F0', 'D2000000'), // HeartGold
+  IPGE: gen4('9223E7EA', '0223E7EC', '0223E7F0', 'D2000000'), // SoulSilver
+  IRBO: gen5('21CB52C', 'F988F1E3'),                          // Black
+  IRAO: gen5('21CB54C', 'F978F1E3'),                          // White
+  IREO: gen5b('21BD6F4'),                                     // Black 2
+  IRDO: gen5b('21BD734'),                                     // White 2
+};
+// O EmulatorJS guarda os cheats de cada jogo no navegador e junta com os que o site passa;
+// no DeSmuME todos ficam ativos (ele ignora o "desligado"). Tira os de EXP antigos antes de abrir.
+function dropStoredExpCheats(id) {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith('ejs-') || !k.endsWith(`-${id}-settings`)) continue;
+      const v = JSON.parse(localStorage.getItem(k));
+      if (!Array.isArray(v?.cheats)) continue;
+      v.cheats = v.cheats.filter(c => !String(c.desc).startsWith('EXP x'));
+      localStorage.setItem(k, JSON.stringify(v));
+    }
+  } catch { /* sem storage */ }
+}
+
 const EXP_OPTIONS = [1, 10, 100, 1000];
 const expKey = (id) => `gba-exp-${id}`;
 const getExpMult = (id) => { try { return Number(localStorage.getItem(expKey(id))) || 1; } catch { return 1; } };
@@ -479,13 +521,28 @@ async function play(file, version) {
     $('#loading-msg').textContent = 'Não consegui baixar a ROM.';
     return;
   }
-  // ---- multiplicador de EXP (só nos Pokémon de GBA/GB/GBC onde o patch confere)
-  const expMult = getExpMult(id);
-  const patched = ['gba', 'gb', 'gbc'].includes(ext) ? await applyExpPatch(rom, expMult, ext) : { rom, available: false };
+  // ---- multiplicador de EXP: patch na ROM (GBA/GB/GBC) ou cheat de Action Replay (DS)
+  let expMult = getExpMult(id);
+  let expOpts = EXP_OPTIONS;
+  let cheats = [];
+  let patched = { rom, available: false };
+  if (['gba', 'gb', 'gbc'].includes(ext)) {
+    patched = await applyExpPatch(rom, expMult, ext);
+  } else if (ext === 'nds') {
+    const code = String.fromCharCode(...new Uint8Array(await rom.slice(0x0c, 0x10).arrayBuffer()));
+    const c = EXP_CHEATS_DS[code];
+    dropStoredExpCheats(id);
+    if (c) {
+      expOpts = c.opts;
+      if (!expOpts.includes(expMult)) expMult = 1;
+      if (expMult > 1) cheats = [[`EXP x${expMult}`, c.code(expMult)]];
+      patched.available = true;
+    }
+  }
   rom = patched.rom;
   const expSel = $('#exp');
   if (patched.available) {
-    expSel.replaceChildren(...EXP_OPTIONS.map(n => el('option', { value: n, textContent: `EXP ${n}x`, selected: n === expMult })));
+    expSel.replaceChildren(...expOpts.map(n => el('option', { value: n, textContent: `EXP ${n}x`, selected: n === expMult })));
     expSel.classList.toggle('fast', expMult > 1);
     expSel.hidden = false;
     expSel.onchange = async () => {
@@ -561,10 +618,14 @@ async function play(file, version) {
   // ---- EmulatorJS
   Object.assign(window, {
     EJS_player: '#game',
-    EJS_core: isN64(ext) ? 'n64' : ext === 'nds' ? 'nds' : ext === 'gba' ? 'gba' : 'gb',
-    // DS: as duas telas lado a lado (o padrão do melonDS é uma em cima da outra).
-    // Dá para trocar em Ajustes → "Screen Layout"; o que você escolher lá fica salvo no navegador.
-    EJS_defaultOptions: ext === 'nds' ? { melonds_screen_layout: 'Left/Right' } : {},
+    // DS no DeSmuME (desmume2015), não no melonDS: é o único que reaplica os cheats a cada
+    // quadro (o multiplicador de EXP depende disso). Não trocar de núcleo com save existente:
+    // o formato do save de um não é garantido no outro.
+    EJS_core: isN64(ext) ? 'n64' : ext === 'nds' ? 'desmume2015' : ext === 'gba' ? 'gba' : 'gb',
+    // DS: as duas telas lado a lado (o padrão é uma em cima da outra). Dá para trocar em
+    // Ajustes → Backend Core Options → "desmume screens layout"; a escolha fica no navegador.
+    EJS_defaultOptions: ext === 'nds' ? { desmume_screens_layout: 'left/right' } : {},
+    EJS_cheats: cheats,
     EJS_gameUrl: URL.createObjectURL(rom),
     EJS_gameName: id,
     EJS_pathtodata: EJS_DATA,
