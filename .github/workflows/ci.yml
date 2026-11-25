@@ -106,7 +106,8 @@ jobs:
           jq -e --arg v "$V" '.ok == true and .versao == $v' health.json
           # Fora do /health e /login, tudo exige sessão.
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/games)" = 401
-          curl -fsS localhost:8081/versao.json | jq -e --arg v "$V" '.versao == $v'
+          # O nginx pode ainda não estar aceitando conexão logo depois do docker run.
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 1 localhost:8081/versao.json | jq -e --arg v "$V" '.versao == $v'
           curl -fsS localhost:8081/ | grep -qi '<!doctype html'
           curl -fsS localhost:8081/robots.txt | grep -q 'Disallow: /'
 
