@@ -1,0 +1,161 @@
+# Qualidade + deploy do gba (API e site no Coolify), sem SSH a partir da máquina local.
+#
+#   push em qualquer branch → qualidade (sintaxe, lint, segredos) e imagens (build, smoke test, trivy)
+#   push na main            → + publica as imagens no GHCR e manda o Coolify trocar a versão (API)
+#
+# Secrets do repositório: COOLIFY_URL e COOLIFY_TOKEN. A VPS baixa as imagens do GHCR com um
+# token só de leitura (read:packages) configurado uma vez com `docker login ghcr.io`.
+name: CI
+
+on:
+  push:
+    paths: ['api/**', 'docs/**', 'tools/**', '.github/workflows/ci.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  API: ghcr.io/afonsolelis/gba-api
+  SITE: ghcr.io/afonsolelis/gba-site
+  HADOLINT: "v2.12.0"
+  TRIVY: "0.58.1"
+  GITLEAKS: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+jobs:
+  qualidade:
+    name: Sintaxe e lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: JavaScript (sintaxe)
+        run: node --check api/server.mjs && node --check docs/app.js
+
+      - name: JSON e Python
+        run: |
+          jq -e . docs/manifest.webmanifest > /dev/null
+          python3 -m py_compile tools/*.py
+
+      - name: Shell
+        run: shellcheck api/*.sh
+
+      - name: Dockerfiles (hadolint)
+        run: |
+          for f in api/Dockerfile api/Dockerfile.site; do
+            docker run --rm -i "hadolint/hadolint:${HADOLINT}" hadolint - < "$f"
+          done
+
+  segredos:
+    name: Segredos (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Instala o gitleaks (checksum conferido)
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS}/gitleaks_${GITLEAKS}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+
+      # O histórico inteiro: o repositório é público, e segredo antigo também vaza.
+      - run: ./gitleaks git --no-banner --redact --exit-code 1 .
+
+  imagens:
+    name: Imagens (build, smoke test, trivy)
+    needs: [qualidade, segredos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: |
+          V="${GITHUB_SHA::12}"
+          docker build --pull --build-arg "VERSAO=$V" -t "$API:$V" api
+          docker build --pull --build-arg "VERSAO=$V" -f api/Dockerfile.site -t "$SITE:$V" .
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          V="${GITHUB_SHA::12}"
+          docker run -d --name api -p 8080:8080 -e S3_ACCESS_KEY=x -e S3_SECRET_KEY=x \
+            -e SESSION_SECRET=x -e PIN_SCRYPT=sal:hash "$API:$V"
+          docker run -d --name site -p 8081:80 "$SITE:$V"
+          docker exec site nginx -t
+          for _ in $(seq 20); do curl -fsS localhost:8080/health > health.json && break; sleep 1; done
+          jq -e --arg v "$V" '.ok == true and .versao == $v' health.json
+          # Fora do /health e /login, tudo exige sessão.
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/games)" = 401
+          curl -fsS localhost:8081/versao.json | jq -e --arg v "$V" '.versao == $v'
+          curl -fsS localhost:8081/ | grep -qi '<!doctype html'
+          curl -fsS localhost:8081/robots.txt | grep -q 'Disallow: /'
+
+      - name: Logs dos containers
+        if: always()
+        run: docker logs api || true; docker logs site || true
+
+      - name: Vulnerabilidades (trivy, HIGH/CRITICAL com correção disponível)
+        run: |
+          for img in "$API:${GITHUB_SHA::12}" "$SITE:${GITHUB_SHA::12}"; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "aquasec/trivy:${TRIVY}" \
+              image --quiet --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$img"
+          done
+
+      - name: Publica no GHCR
+        if: github.ref == 'refs/heads/main'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$API:${GITHUB_SHA::12}"
+          docker push "$SITE:${GITHUB_SHA::12}"
+
+  deploy:
+    name: Deploy (Coolify)
+    if: github.ref == 'refs/heads/main'
+    needs: imagens
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: producao
+      url: https://gba.afonsolelis.tech
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compose válido
+        run: |
+          sed "s/__VERSAO__/${GITHUB_SHA::12}/" api/docker-compose.yml > /tmp/compose.yml
+          S3_ACCESS_KEY=x S3_SECRET_KEY=x PIN_SCRYPT=x SESSION_SECRET=x docker compose -f /tmp/compose.yml config -q
+
+      - name: Publica a versão
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          api/coolify-deploy.sh hyrtindyx5cfhhioy7heu7pc api/docker-compose.yml "${GITHUB_SHA::12}" \
+            https://gba-api.afonsolelis.tech/health https://gba.afonsolelis.tech/versao.json

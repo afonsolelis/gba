@@ -180,7 +180,8 @@ async function put(key, body, type = 'application/octet-stream') {
 const lastHistory = new Map();
 
 const routes = {
-  'GET /health': async (req, res) => send(res, 200, { ok: true }),
+  // APP_VERSAO vem do build (commit); o CI espera ver a versão nova aqui para dar o deploy por concluído.
+  'GET /health': async (req, res) => send(res, 200, { ok: true, versao: env.APP_VERSAO || 'dev' }),
 
   'POST /login': async (req, res) => {
     const ip = clientIp(req);

@@ -1,12 +1,12 @@
-# gba-api no Coolify (projeto gba). Sem build: node:22-alpine roda o
-# server.mjs que fica em /data/gba/api na VPS (copiado por api/deploy.sh).
-# `site` é um espelho do docs/ em https://gba.afonsolelis.tech (nginx servindo
-# /data/gba/site), além do GitHub Pages.
+# gba-api no Coolify (projeto gba, serviço hyrtindyx5cfhhioy7heu7pc).
+# Fonte da verdade do compose da VPS. Quem aplica é o CI (.github/workflows/ci.yml):
+# troca __VERSAO__ pelo commit, manda o compose para o Coolify pela API e reinicia o serviço.
+# Imagens no GHCR; a VPS tem `docker login ghcr.io` com um token só de leitura.
+# `site` serve o docs/ em https://gba.afonsolelis.tech (imagem nginx com o site dentro).
 # Segredos são variáveis do serviço no Coolify (cópia em ~/repos/hostinger/.env, GBA_*).
 services:
   api:
-    image: 'node:22.23.5-alpine'
-    command: ['node', '/app/server.mjs']
+    image: 'ghcr.io/afonsolelis/gba-api:__VERSAO__'
     environment:
       SERVICE_FQDN_API_8080: ''
       PORT: '8080'
@@ -18,8 +18,6 @@ services:
       SESSION_SECRET: ${SESSION_SECRET}
       ALLOWED_ORIGINS: 'https://afonsolelis.github.io,https://gba.afonsolelis.tech'
       TZ: America/Sao_Paulo
-    volumes:
-      - '/data/gba/api:/app:ro'
     mem_limit: 128m
     restart: unless-stopped
     healthcheck:
@@ -29,12 +27,9 @@ services:
       retries: 3
 
   site:
-    image: 'nginx:1.29-alpine'
+    image: 'ghcr.io/afonsolelis/gba-site:__VERSAO__'
     environment:
       SERVICE_FQDN_SITE_80: ''
-    volumes:
-      - '/data/gba/site:/usr/share/nginx/html:ro'
-      - '/data/gba/nginx.conf:/etc/nginx/conf.d/default.conf:ro'
     mem_limit: 32m
     restart: unless-stopped
     healthcheck:

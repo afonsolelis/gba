@@ -4,7 +4,7 @@ Emulador de Game Boy Advance (e GB/GBC, Nintendo 64 e Nintendo DS) no navegador,
 login por PIN e saves sincronizados num bucket S3 (RustFS) na VPS.
 
 - **Site:** https://gba.afonsolelis.tech — `docs/` servido por nginx na VPS (serviço `site` do mesmo
-  compose, config em `api/nginx.conf`; `api/deploy.sh` copia). O GitHub Pages foi despublicado em
+  compose, config em `api/nginx.conf`, imagem `api/Dockerfile.site`). O GitHub Pages foi despublicado em
   11/11: o Actions dava `startup_failure` interno e o github.io ficou preso numa versão velha.
   Para religar: Settings → Pages → Source "GitHub Actions" e `gh workflow enable pages.yml`.
 - **API:** https://gba-api.afonsolelis.tech — `api/server.mjs`, Node 22 sem dependências, no Coolify (projeto `gba`).
@@ -89,5 +89,5 @@ SESSION_SECRET=$GBA_SESSION_SECRET ALLOWED_ORIGINS=http://localhost:8000 PORT=87
 python3 -m http.server 8000 -d docs
 ```
 
-Deploy: `api/deploy.sh` (copia `server.mjs` → `/data/gba/api`, `nginx.conf` → `/data/gba/nginx.conf` e `docs/` → `/data/gba/site` na VPS e reinicia o serviço). Mudou o `api/docker-compose.yml`? Mande para o Coolify (PATCH `docker_compose_raw`) antes.
+Deploy: `git push` na main. O GitHub Actions (`.github/workflows/ci.yml`) roda sintaxe, hadolint, gitleaks, build das imagens `gba-api` e `gba-site`, smoke test e trivy, publica no GHCR e manda o Coolify trocar a versão pela API (`api/coolify-deploy.sh`, compose em `api/docker-compose.yml`). Sem SSH.
 O compose do serviço está em `api/docker-compose.yml`.
