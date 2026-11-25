@@ -30,6 +30,11 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   print da tela vira a capa do jogo na biblioteca.
 - **Velocidade:** botão `1x…5x → 10x` na barra do jogo (ou teclas 1–9, e 0 = 10x). Usa o fast-forward do EmulatorJS,
   então o botão "Rápido" do gamepad virtual segue a mesma velocidade.
+- **Multiplicador de EXP:** seletor `EXP 1x/10x/100x/1000x` na barra, nos Pokémon de GBA (Ruby,
+  Sapphire, Emerald, FireRed, LeafGreen) e de GB/GBC (Red, Blue, Yellow, Gold, Silver, Crystal 1.1).
+  É um patch na ROM aplicado na memória ao abrir (a ROM do lake não muda), só quando os bytes
+  originais conferem; a escolha fica no navegador. Gerados e testados por `tools/exp_patch.py` (GBA,
+  Unicorn) e `tools/exp_patch_gb.py` (GB/GBC, PyBoy). Green (japonês) e os de DS não têm.
 - **Controles (teclado):** A = `Z`, B = `X`, L = `Q`, R = `E`, Start = `Enter`, Select = `V`, setas = direcional;
   `1`–`5` = velocidade. Os atalhos 1/2/3 do EmulatorJS (quick save/load/slot) foram desligados: gravavam
   só no navegador e brigavam com a velocidade. Dá para remapear no ícone de controle da barra do emulador

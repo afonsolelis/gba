@@ -48,6 +48,41 @@ const EXP_PATCHES = {
     caveOrig: 'f0b582b00004040c09060f0e1206160e0025fa218900201c4ff130fd0006000e',
     cavePatch: '00b5054a50434ff125fa0449884200d9084602bc084700bfe8030000e4250000' },
 };
+// ---- Multiplicador de EXP (Pokémon de Game Boy / Color)
+// Mesma ideia: em GainExperience (Gen 1) / GiveExperiencePoints (Gen 2) o `call Divide`
+// da conta `baseExp * level / 7` passa a chamar uma caverna no fim do mesmo banco (área
+// livre, toda 00), que chama o Divide original, multiplica por F1 e F2 (lit1/lit2, com o
+// Multiply do próprio jogo: 10 = 10·1, 100 = 100·1, 1000 = 10·100) e corta no teto
+// (Gen 1: 28927, Gen 2: 19199) para o BoostExp (×1,5 sem checar estouro) não passar de 16 bits.
+// Chave: título do cabeçalho (0x134–0x142; o 0x143 é a flag de GBC). Confere os bytes do site e se a caverna está zerada.
+// Gerado e testado (PyBoy, rodando o Multiply/Divide do jogo) por tools/exp_patch_gb.py.
+const EXP_PATCHES_GB = {
+  'POKEMON RED': { // Red
+    site: 0x552b9, siteOrig: 'cdb938', sitePatch: 'cd5b6a',
+    cave: 0x56a5b, lit1: 0x56a62, lit2: 0x56a69,
+    cavePatch: 'c5d5e5cdb9383e01e099cdac383e01e099cdac38f095a7200bf096a72006f097fe7138083e70e0973effe098afe095e096e1d1c1c9' },
+  'POKEMON BLUE': { // Blue
+    site: 0x552b9, siteOrig: 'cdb938', sitePatch: 'cd5b6a',
+    cave: 0x56a5b, lit1: 0x56a62, lit2: 0x56a69,
+    cavePatch: 'c5d5e5cdb9383e01e099cdac383e01e099cdac38f095a7200bf096a72006f097fe7138083e70e0973effe098afe095e096e1d1c1c9' },
+  'POKEMON YELLOW': { // Yellow
+    site: 0x552c8, siteOrig: 'cdb238', sitePatch: 'cda769',
+    cave: 0x569a7, lit1: 0x569ae, lit2: 0x569b5,
+    cavePatch: 'c5d5e5cdb2383e01e099cda5383e01e099cda538f095a7200bf096a72006f097fe7138083e70e0973effe098afe095e096e1d1c1c9' },
+  'POKEMON_GLDAAUE': { // Gold
+    site: 0x3ecf9, siteOrig: 'cdc931', sitePatch: 'cdab7e',
+    cave: 0x3feab, lit1: 0x3feb2, lit2: 0x3feb9,
+    cavePatch: 'c5d5e5cdc9313e01e0b9cdbe313e01e0b9cdbe31f0b5a7200bf0b6a72006f0b7fe4b38083e4ae0b73effe0b8afe0b5e0b6e1d1c1c9' },
+  'POKEMON_SLVAAXE': { // Silver
+    site: 0x3ecf9, siteOrig: 'cdc931', sitePatch: 'cdab7e',
+    cave: 0x3feab, lit1: 0x3feb2, lit2: 0x3feb9,
+    cavePatch: 'c5d5e5cdc9313e01e0b9cdbe313e01e0b9cdbe31f0b5a7200bf0b6a72006f0b7fe4b38083e4ae0b73effe0b8afe0b5e0b6e1d1c1c9' },
+  'PM_CRYSTAL': { // Crystal (1.1)
+    site: 0x3eec6, siteOrig: 'cd2431', sitePatch: 'cd967e',
+    cave: 0x3fe96, lit1: 0x3fe9d, lit2: 0x3fea4,
+    cavePatch: 'c5d5e5cd24313e01e0b7cd19313e01e0b7cd1931f0b3a7200bf0b4a72006f0b5fe4b38083e4ae0b53effe0b6afe0b3e0b4e1d1c1c9' },
+};
+const GB_FACTORS = { 10: [10, 1], 100: [100, 1], 1000: [10, 100] };
 const EXP_OPTIONS = [1, 10, 100, 1000];
 const expKey = (id) => `gba-exp-${id}`;
 const getExpMult = (id) => { try { return Number(localStorage.getItem(expKey(id))) || 1; } catch { return 1; } };
@@ -57,8 +92,9 @@ const hexBytes = (h) => Uint8Array.from(h.match(/../g), b => parseInt(b, 16));
 const sameBytes = (rom, off, hex) => hexBytes(hex).every((b, i) => rom[off + i] === b);
 
 // Devolve { rom, available }: available = o patch serve para esta ROM.
-async function applyExpPatch(blob, mult) {
+async function applyExpPatch(blob, mult, ext) {
   const rom = new Uint8Array(await blob.arrayBuffer());
+  if (ext !== 'gba') return applyExpPatchGb(blob, rom, mult);
   const code = String.fromCharCode(...rom.subarray(0xac, 0xb0));
   const p = EXP_PATCHES[code];
   const available = !!p && sameBytes(rom, p.site, p.siteOrig) && sameBytes(rom, p.cave, p.caveOrig);
@@ -66,6 +102,18 @@ async function applyExpPatch(blob, mult) {
   rom.set(hexBytes(p.sitePatch), p.site);
   rom.set(hexBytes(p.cavePatch), p.cave);
   new DataView(rom.buffer).setUint32(p.litM, mult, true);
+  return { rom: new Blob([rom]), available };
+}
+
+function applyExpPatchGb(blob, rom, mult) {
+  const title = String.fromCharCode(...rom.subarray(0x134, 0x143)).split('\0')[0];
+  const p = EXP_PATCHES_GB[title];
+  const n = p ? hexBytes(p.cavePatch).length : 0;
+  const available = !!p && sameBytes(rom, p.site, p.siteOrig) && rom.subarray(p.cave, p.cave + n).every(b => b === 0);
+  if (!available || mult <= 1) return { rom: blob, available };
+  rom.set(hexBytes(p.cavePatch), p.cave);
+  [rom[p.lit1], rom[p.lit2]] = GB_FACTORS[mult];
+  rom.set(hexBytes(p.sitePatch), p.site);
   return { rom: new Blob([rom]), available };
 }
 
@@ -431,9 +479,9 @@ async function play(file, version) {
     $('#loading-msg').textContent = 'Não consegui baixar a ROM.';
     return;
   }
-  // ---- multiplicador de EXP (só nos Pokémon de GBA onde o patch confere)
+  // ---- multiplicador de EXP (só nos Pokémon de GBA/GB/GBC onde o patch confere)
   const expMult = getExpMult(id);
-  const patched = ext === 'gba' ? await applyExpPatch(rom, expMult) : { rom, available: false };
+  const patched = ['gba', 'gb', 'gbc'].includes(ext) ? await applyExpPatch(rom, expMult, ext) : { rom, available: false };
   rom = patched.rom;
   const expSel = $('#exp');
   if (patched.available) {
