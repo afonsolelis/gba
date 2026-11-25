@@ -41,8 +41,8 @@ celular / navegador ──(PIN → token Bearer)──► gba-api ──(SigV4)�
   L = `Q`, R = `E`, Start = `Enter`, botões C = `I`/`J`/`K`/`L`, direcional = `T`/`F`/`G`/`H`.
   Savestate de N64 é grande (vários MB; o limite da API é 48 MB).
 - **Nintendo DS:** ROMs `.nds` usam o núcleo `nds` (melonDS) e vão para a prateleira "Nintendo DS"
-  (os Pokémon, para "Pokémon · Nintendo DS"). As duas telas aparecem juntas; a de toque responde ao
-  mouse/dedo. Teclado: A = `Z`, B = `X`, X = `A`, Y = `S`, L = `Q`, R = `E`. ROMs de DS passam de
+  (os Pokémon, para "Pokémon · Nintendo DS"). As duas telas ficam lado a lado (`melonds_screen_layout:
+  Left/Right`; dá para trocar em Ajustes → Screen Layout); a de toque responde ao mouse/dedo. Teclado: A = `Z`, B = `X`, X = `A`, Y = `S`, L = `Q`, R = `E`. ROMs de DS passam de
   100 MB e o `PUT /rom` da API junta tudo na memória (container de 128 MB): suba as grandes direto no
   bucket (`roms/<id>.nds`), não pelo `+ ROM`.
 - **ROMs novas:** botão `+ ROM` na biblioteca (vai para `roms/`). Aceita `.zip`: o site descompacta

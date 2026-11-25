@@ -514,6 +514,9 @@ async function play(file, version) {
   Object.assign(window, {
     EJS_player: '#game',
     EJS_core: isN64(ext) ? 'n64' : ext === 'nds' ? 'nds' : ext === 'gba' ? 'gba' : 'gb',
+    // DS: as duas telas lado a lado (o padrão do melonDS é uma em cima da outra).
+    // Dá para trocar em Ajustes → "Screen Layout"; o que você escolher lá fica salvo no navegador.
+    EJS_defaultOptions: ext === 'nds' ? { melonds_screen_layout: 'Left/Right' } : {},
     EJS_gameUrl: URL.createObjectURL(rom),
     EJS_gameName: id,
     EJS_pathtodata: EJS_DATA,
