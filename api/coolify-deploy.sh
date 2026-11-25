@@ -2,7 +2,7 @@
 # Publica uma versão num serviço do Coolify, sem SSH: manda o compose pela API,
 # reinicia o serviço e espera cada URL de saúde responder {"versao": "<versao>"}.
 #
-#   deploy/coolify-deploy.sh <uuid-do-servico> <compose> <versao> <url-saude>...
+#   api/coolify-deploy.sh <uuid-do-servico> <compose> <versao> <url-saude>...
 #
 # Precisa de COOLIFY_URL e COOLIFY_TOKEN no ambiente (secrets do repositório no GitHub).
 set -euo pipefail
